@@ -1,0 +1,109 @@
+### version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    container_name: medical-3d-db
+    environment:
+      POSTGRES_DB: ${DB_NAME:-medical3dprint}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: medical-3d-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: medical-3d-backend
+    command: python manage.py runserver 0.0.0.0:8000
+    environment:
+      DEBUG: ${DEBUG:-True}
+      DJANGO_SETTINGS_MODULE: config.settings
+      DB_ENGINE: django.db.backends.postgresql
+      DB_NAME: ${DB_NAME:-medical3dprint}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_HOST: db
+      DB_PORT: "5432"
+      SECRET_KEY: ${SECRET_KEY:-django-insecure-dev-key-change-in-production}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1}
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    stdin_open: true
+    tty: true
+
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: medical-3d-celery
+    command: celery -A config worker -l info
+    environment:
+      DEBUG: ${DEBUG:-True}
+      DJANGO_SETTINGS_MODULE: config.settings
+      DB_ENGINE: django.db.backends.postgresql
+      DB_NAME: ${DB_NAME:-medical3dprint}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_HOST: db
+      DB_PORT: "5432"
+      SECRET_KEY: ${SECRET_KEY:-django-insecure-dev-key-change-in-production}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+      - backend
+    volumes:
+      - ./backend:/app
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: medical-3d-frontend
+    command: npm run dev
+    environment:
+      # When frontend runs in Docker, it must reach backend by service name.
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://backend:8000/api}
+    ports:
+      - "5175:5175"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+volumes:
+  postgres_data:
+
+networks:
+  default:
+    name: medical-3d-network

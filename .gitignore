@@ -1,0 +1,71 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+venv/
+ENV/
+env/
+
+# Django
+*.log
+/static/
+/media/
+db.sqlite3
+db.sqlite3-journal
+/local_settings.py
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+dist/
+.next/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Migrations (except initial)
+migrations/0*.py
+
+# Local files
+*.bak
+*.backup
