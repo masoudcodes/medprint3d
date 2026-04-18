@@ -1,25 +1,141 @@
 """
 slicer_convert.py
 -----------------
-This script runs INSIDE 3D Slicer's Python environment (not standard Python).
-Django/Celery calls Slicer headlessly and passes this script to it.
+Pure-Python DICOM → STL conversion using pydicom + scikit-image.
+No 3D Slicer installation required.
 
-How Slicer calls it:
-    Slicer --no-main-window --python-script /path/to/slicer_convert.py -- <dicom_dir> <output_stl>
-
-What it does:
-    1. Loads a DICOM series from <dicom_dir>
-    2. Segments bone/anatomy using Hounsfield Unit (HU) threshold (200–3000 HU)
-    3. Exports the segmentation as an STL file to <output_stl>
-    4. Exits Slicer
+Steps:
+  1. Load all DICOM slices from a directory (or single .dcm file)
+  2. Sort slices by position and stack into a 3D volume
+  3. Apply marching cubes at bone HU threshold (200 HU)
+  4. Write output as binary STL
 """
 
-import sys
 import os
+import sys
+import struct
+import numpy as np
 
 
-def main():
-    # Args are passed after the '--' separator
+def load_dicom_volume(dicom_dir: str):
+    """Load and sort DICOM slices, return (volume_array, spacing)."""
+    import pydicom
+
+    files = []
+    for root, _, filenames in os.walk(dicom_dir):
+        for fname in filenames:
+            fpath = os.path.join(root, fname)
+            try:
+                ds = pydicom.dcmread(fpath, stop_before_pixels=True)
+                if hasattr(ds, 'SOPClassUID'):
+                    files.append(fpath)
+            except Exception:
+                continue
+
+    if not files:
+        raise ValueError(f"No valid DICOM files found in {dicom_dir}")
+
+    print(f"[Convert] Found {len(files)} DICOM file(s)")
+
+    slices = []
+    for fpath in files:
+        try:
+            ds = pydicom.dcmread(fpath)
+            if hasattr(ds, 'PixelData'):
+                slices.append(ds)
+        except Exception:
+            continue
+
+    if not slices:
+        raise ValueError("No DICOM slices with pixel data found")
+
+    # Sort by ImagePositionPatient Z or InstanceNumber
+    def sort_key(s):
+        if hasattr(s, 'ImagePositionPatient'):
+            return float(s.ImagePositionPatient[2])
+        if hasattr(s, 'InstanceNumber'):
+            return int(s.InstanceNumber)
+        return 0
+
+    slices.sort(key=sort_key)
+    print(f"[Convert] Loaded {len(slices)} slices")
+
+    # Get pixel spacing
+    spacing_xy = [1.0, 1.0]
+    spacing_z = 1.0
+
+    if hasattr(slices[0], 'PixelSpacing'):
+        spacing_xy = [float(slices[0].PixelSpacing[0]), float(slices[0].PixelSpacing[1])]
+
+    if len(slices) > 1 and hasattr(slices[0], 'ImagePositionPatient') and hasattr(slices[1], 'ImagePositionPatient'):
+        spacing_z = abs(float(slices[1].ImagePositionPatient[2]) - float(slices[0].ImagePositionPatient[2]))
+        if spacing_z == 0:
+            spacing_z = 1.0
+    elif hasattr(slices[0], 'SliceThickness'):
+        spacing_z = float(slices[0].SliceThickness) or 1.0
+
+    # Filter to the most common slice shape (removes scouts/localizers with different dimensions)
+    from collections import Counter
+    shape_counts = Counter(s.pixel_array.shape for s in slices)
+    dominant_shape = shape_counts.most_common(1)[0][0]
+    slices = [s for s in slices if s.pixel_array.shape == dominant_shape]
+    print(f"[Convert] Using {len(slices)} slices with shape {dominant_shape}")
+
+    # Build volume
+    volume = np.stack([s.pixel_array.astype(np.float32) for s in slices], axis=0)
+
+    # Apply rescale slope/intercept to get HU values
+    slope = float(getattr(slices[0], 'RescaleSlope', 1))
+    intercept = float(getattr(slices[0], 'RescaleIntercept', 0))
+    volume = volume * slope + intercept
+
+    print(f"[Convert] Volume shape: {volume.shape}, HU range: {volume.min():.0f} to {volume.max():.0f}")
+
+    return volume, (spacing_z, spacing_xy[0], spacing_xy[1])
+
+
+def volume_to_stl(volume: np.ndarray, spacing: tuple, output_stl: str, threshold: float = 200.0):
+    """Apply marching cubes and write binary STL."""
+    from skimage.measure import marching_cubes
+
+    print(f"[Convert] Running marching cubes at {threshold} HU threshold...")
+    verts, faces, _, _ = marching_cubes(volume, level=threshold, spacing=spacing)
+    print(f"[Convert] Mesh: {len(verts)} vertices, {len(faces)} faces")
+
+    # Write binary STL
+    os.makedirs(os.path.dirname(os.path.abspath(output_stl)), exist_ok=True)
+
+    with open(output_stl, 'wb') as f:
+        # 80-byte header
+        f.write(b'\0' * 80)
+        # Number of triangles
+        f.write(struct.pack('<I', len(faces)))
+        for face in faces:
+            v0, v1, v2 = verts[face[0]], verts[face[1]], verts[face[2]]
+            # Compute normal
+            edge1 = v1 - v0
+            edge2 = v2 - v0
+            normal = np.cross(edge1, edge2)
+            norm_len = np.linalg.norm(normal)
+            if norm_len > 0:
+                normal = normal / norm_len
+            # Write normal + 3 vertices + attribute
+            f.write(struct.pack('<fff', *normal))
+            f.write(struct.pack('<fff', *v0))
+            f.write(struct.pack('<fff', *v1))
+            f.write(struct.pack('<fff', *v2))
+            f.write(struct.pack('<H', 0))
+
+    size_mb = os.path.getsize(output_stl) / (1024 * 1024)
+    print(f"[Convert] STL written: {output_stl} ({size_mb:.1f} MB)")
+
+
+def convert(dicom_dir: str, output_stl: str, threshold: float = 200.0):
+    volume, spacing = load_dicom_volume(dicom_dir)
+    volume_to_stl(volume, spacing, output_stl, threshold)
+
+
+if __name__ == '__main__':
     try:
         sep = sys.argv.index('--')
         args = sys.argv[sep + 1:]
@@ -27,115 +143,7 @@ def main():
         args = sys.argv[1:]
 
     if len(args) < 2:
-        print("[SlicerConvert] ERROR: Expected arguments: <dicom_dir> <output_stl>")
+        print("Usage: python slicer_convert.py -- <dicom_dir> <output_stl>")
         sys.exit(1)
 
-    dicom_dir = args[0]
-    output_stl = args[1]
-
-    print(f"[SlicerConvert] DICOM source : {dicom_dir}")
-    print(f"[SlicerConvert] Output STL   : {output_stl}")
-
-    # ------------------------------------------------------------------ #
-    # 1. Import Slicer modules (only available inside Slicer's Python)
-    # ------------------------------------------------------------------ #
-    try:
-        import slicer  # type: ignore  # provided by Slicer runtime
-        from DICOMLib import DICOMUtils  # type: ignore
-    except ImportError as e:
-        raise RuntimeError(
-            "This script must be executed inside 3D Slicer's Python environment "
-            "(where 'slicer' and 'DICOMLib' are available)."
-        ) from e
-
-    # ------------------------------------------------------------------ #
-    # 2. Load DICOM series
-    # ------------------------------------------------------------------ #
-    print("[SlicerConvert] Importing DICOM files …")
-    with DICOMUtils.TemporaryDICOMDatabase() as db:
-        DICOMUtils.importDicom(dicom_dir, db)
-        patient_ids = db.patients()
-
-        if not patient_ids:
-            print("[SlicerConvert] ERROR: No DICOM patients found in directory")
-            slicer.app.quit()
-            sys.exit(1)
-
-        # Load the first patient
-        DICOMUtils.loadPatientByUID(patient_ids[0])
-
-    # ------------------------------------------------------------------ #
-    # 3. Get the scalar volume node
-    # ------------------------------------------------------------------ #
-    volume_node = slicer.mrmlScene.GetFirstNodeByClass('vtkMRMLScalarVolumeNode')
-    if not volume_node:
-        print("[SlicerConvert] ERROR: No volume node found after DICOM load")
-        slicer.app.quit()
-        sys.exit(1)
-
-    print(f"[SlicerConvert] Volume loaded: {volume_node.GetName()}")
-
-    # ------------------------------------------------------------------ #
-    # 4. Create segmentation using Threshold effect
-    #    HU 200–3000 captures cortical bone and dense tissue.
-    #    Adjust thresholds here if needed for soft tissue (e.g. 30–150).
-    # ------------------------------------------------------------------ #
-    seg_node = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLSegmentationNode')
-    seg_node.CreateDefaultDisplayNodes()
-    seg_node.SetReferenceImageGeometryParameterFromVolumeNode(volume_node)
-
-    segment_id = seg_node.GetSegmentation().AddEmptySegment('Anatomy')
-
-    seg_editor = slicer.qMRMLSegmentEditorWidget()
-    seg_editor.setMRMLScene(slicer.mrmlScene)
-    seg_editor_node = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLSegmentEditorNode')
-    seg_editor.setMRMLSegmentEditorNode(seg_editor_node)
-    seg_editor.setSegmentationNode(seg_node)
-    seg_editor.setSourceVolumeNode(volume_node)
-    seg_editor.setCurrentSegmentID(segment_id)
-
-    seg_editor.setActiveEffectByName('Threshold')
-    effect = seg_editor.activeEffect()
-    effect.setParameter('MinimumThreshold', '200')
-    effect.setParameter('MaximumThreshold', '3000')
-    effect.self().onApply()
-
-    print("[SlicerConvert] Segmentation complete")
-
-    # ------------------------------------------------------------------ #
-    # 5. Export STL
-    # ------------------------------------------------------------------ #
-    output_dir = os.path.dirname(os.path.abspath(output_stl))
-    os.makedirs(output_dir, exist_ok=True)
-
-    slicer.vtkSlicerSegmentationsModuleLogic \
-        .ExportSegmentsClosedSurfaceRepresentationToFiles(
-            output_dir,
-            seg_node,
-            None,    # export all segments
-            'STL',
-            True,    # merge all segments into one file
-            1.0,     # smoothing factor (0 = none, 1 = max)
-            False,   # lossless
-        )
-
-    # Rename whichever .stl was created to the desired output path
-    stl_files = [f for f in os.listdir(output_dir) if f.lower().endswith('.stl')]
-    if not stl_files:
-        print("[SlicerConvert] ERROR: Slicer did not produce an STL file")
-        slicer.app.quit()
-        sys.exit(1)
-
-    generated = os.path.join(output_dir, stl_files[0])
-    if generated != output_stl:
-        os.replace(generated, output_stl)
-
-    print(f"[SlicerConvert] STL exported: {output_stl}")
-
-    # ------------------------------------------------------------------ #
-    # 6. Done — exit Slicer
-    # ------------------------------------------------------------------ #
-    slicer.app.quit()
-
-
-main()
+    convert(args[0], args[1])
