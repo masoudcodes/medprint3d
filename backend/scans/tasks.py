@@ -1,48 +1,31 @@
 """
 scans/tasks.py
 --------------
-Celery background task that converts an uploaded DICOM file to a 3D STL
-model by calling 3D Slicer headlessly.
-
-Prerequisites (local machine):
-  - 3D Slicer installed
-  - SLICER_PATH set in .env pointing to the Slicer executable
-  - Redis running  (celery broker)
-  - Celery worker running: celery -A config worker --loglevel=info
+DICOM → STL conversion using pure Python (pydicom + scikit-image).
+No 3D Slicer installation required.
 """
 
 import os
 import shutil
-import subprocess
 import tempfile
 import zipfile
 
 from celery import shared_task
-from django.conf import settings
 from django.core.files.base import ContentFile
 
 
-@shared_task(bind=True, max_retries=0)
-def convert_scan_to_3d(self, scan_id: str) -> None:
+def convert_scan_to_3d_sync(scan_id: str) -> None:
     """
-    1. Mark scan as PROCESSING
-    2. Prepare DICOM directory (handle single .dcm or .zip of series)
-    3. Call Slicer headlessly with slicer_convert.py
-    4. Save the output STL to scan.model_file
-    5. Mark scan as COMPLETED (or FAILED on error)
+    Run DICOM → STL conversion synchronously.
+    Called in a background thread from the view — no Celery/Redis needed.
     """
-    from .models import Scan  # local import to avoid circular import
+    from .models import Scan
+    from .slicer_convert import convert
 
     try:
         scan = Scan.objects.get(id=scan_id)
     except Scan.DoesNotExist:
         return
-
-    # ------------------------------------------------------------------ #
-    # Mark as processing immediately so the UI updates
-    # ------------------------------------------------------------------ #
-    scan.status = 'PROCESSING'
-    scan.save(update_fields=['status', 'updated_at'])
 
     tmp_dir = tempfile.mkdtemp(prefix='medprint_')
     try:
@@ -51,76 +34,74 @@ def convert_scan_to_3d(self, scan_id: str) -> None:
         dicom_dir = os.path.join(tmp_dir, 'dicom')
         os.makedirs(dicom_dir, exist_ok=True)
 
-        # ------------------------------------------------------------------ #
-        # Prepare DICOM input directory
-        # ------------------------------------------------------------------ #
+        # Extract zip or copy single .dcm (primary file)
         if ext == '.zip':
-            # Zip archive of a DICOM series — extract into dicom_dir
             with zipfile.ZipFile(dicom_path, 'r') as zf:
                 zf.extractall(dicom_dir)
         else:
-            # Single .dcm file — copy into dicom_dir so Slicer can scan the folder
             shutil.copy2(dicom_path, dicom_dir)
 
-        # ------------------------------------------------------------------ #
-        # Paths
-        # ------------------------------------------------------------------ #
+        # Also copy/extract any additional ScanFile objects
+        from .models import ScanFile
+        for sf in ScanFile.objects.filter(scan=scan):
+            sf_path = sf.file.path
+            sf_ext = os.path.splitext(sf_path)[1].lower()
+            if sf_ext == '.zip':
+                with zipfile.ZipFile(sf_path, 'r') as zf:
+                    zf.extractall(dicom_dir)
+            else:
+                shutil.copy2(sf_path, dicom_dir)
+
         output_stl = os.path.join(tmp_dir, f'scan_{scan_id}.stl')
-        script_path = os.path.join(os.path.dirname(__file__), 'slicer_convert.py')
-        slicer_exe = settings.SLICER_PATH
 
-        if not os.path.exists(slicer_exe):
-            raise FileNotFoundError(
-                f"Slicer executable not found at: {slicer_exe}\n"
-                f"Set SLICER_PATH in your .env file."
-            )
+        # Run pure-Python conversion
+        convert(dicom_dir, output_stl, threshold=200.0)
 
-        # ------------------------------------------------------------------ #
-        # Run Slicer headlessly
-        # Timeout: 10 minutes — large CT series can take a while
-        # ------------------------------------------------------------------ #
-        cmd = [
-            slicer_exe,
-            '--no-main-window',
-            '--python-script', script_path,
-            '--', dicom_dir, output_stl,
-        ]
+        if not os.path.exists(output_stl):
+            raise RuntimeError("STL file was not produced")
 
-        result = subprocess.run(
-            cmd,
-            timeout=600,
-            capture_output=True,
-            text=True,
-        )
-
-        # Log output for debugging
-        if result.stdout:
-            print(f"[Slicer stdout]\n{result.stdout}")
-        if result.stderr:
-            print(f"[Slicer stderr]\n{result.stderr}")
-
-        if result.returncode != 0 or not os.path.exists(output_stl):
-            raise RuntimeError(
-                f"Slicer exited with code {result.returncode}.\n"
-                f"stderr: {result.stderr[-500:]}"
-            )
-
-        # ------------------------------------------------------------------ #
-        # Save STL to scan.model_file (Django stores in media/scans/models/)
-        # ------------------------------------------------------------------ #
+        # Save STL to Django media storage
         with open(output_stl, 'rb') as f:
             stl_filename = f'scans/models/scan_{scan_id}.stl'
             scan.model_file.save(stl_filename, ContentFile(f.read()), save=False)
 
         scan.status = 'COMPLETED'
         scan.save(update_fields=['status', 'model_file', 'updated_at'])
-        print(f"[convert_scan_to_3d] Scan {scan_id} → COMPLETED")
+        print(f"[convert_scan_to_3d_sync] Scan {scan_id} → COMPLETED")
+
+        # Email the doctor
+        try:
+            from django.core.mail import send_mail
+            doctor = scan.user
+            send_mail(
+                subject=f'[MedPrint 3D] Case {scan.case_number} — 3D Model Ready',
+                message=(
+                    f'Dear Dr. {doctor.first_name} {doctor.last_name},\n\n'
+                    f'Your case has been processed successfully.\n\n'
+                    f'Case Number : {scan.case_number}\n'
+                    f'Patient     : {scan.patient_name}\n'
+                    f'Status      : Completed\n\n'
+                    f'Log in to your dashboard to download the STL file and request a print.\n\n'
+                    f'MedPrint 3D Team'
+                ),
+                from_email='noreply@medprint3d.com',
+                recipient_list=[doctor.email],
+                fail_silently=True,
+            )
+            print(f"[convert_scan_to_3d_sync] Email sent to {doctor.email}")
+        except Exception as mail_exc:
+            print(f"[convert_scan_to_3d_sync] Email failed: {mail_exc}")
 
     except Exception as exc:
         scan.status = 'FAILED'
         scan.save(update_fields=['status', 'updated_at'])
-        print(f"[convert_scan_to_3d] Scan {scan_id} → FAILED: {exc}")
-        raise  # re-raise so Celery records the failure
+        print(f"[convert_scan_to_3d_sync] Scan {scan_id} → FAILED: {exc}")
 
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+@shared_task(bind=True, max_retries=0)
+def convert_scan_to_3d(self, scan_id: str) -> None:
+    """Celery task — delegates to the sync function."""
+    convert_scan_to_3d_sync(scan_id)

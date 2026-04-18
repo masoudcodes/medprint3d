@@ -9,7 +9,9 @@ import {
   Col,
   Dropdown,
   Empty,
+  Input,
   Layout,
+  Upload,
   Popconfirm,
   Row,
   Select,
@@ -35,6 +37,8 @@ import {
   LogoutOutlined,
   ReloadOutlined,
   ThunderboltOutlined,
+  ToolOutlined,
+  UploadOutlined,
   UserOutlined,
 } from '@ant-design/icons'
 import type { MenuProps } from 'antd'
@@ -59,9 +63,11 @@ interface Scan {
   patient_name: string
   title: string
   notes: string
+  admin_notes: string
   dicom_file: string | null
   status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
   model_file: string | null
+  dev_model_file: string | null
   created_at: string
   updated_at: string
 }
@@ -93,6 +99,9 @@ export default function AdminDashboard() {
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [convertingIds, setConvertingIds] = useState<Set<string>>(new Set())
   const [activeTab, setActiveTab] = useState('files')
+  const [adminNoteDrafts, setAdminNoteDrafts] = useState<Record<string, string>>({})
+  const [savingNoteId, setSavingNoteId] = useState<string | null>(null)
+  const [uploadingDevId, setUploadingDevId] = useState<string | null>(null)
 
   const scansRef = useRef<Scan[]>([])
   scansRef.current = scans
@@ -188,6 +197,45 @@ export default function AdminDashboard() {
       setFiltered((prev) => prev.map((s) => s.id === scanId ? { ...s, status: res.data.status } : s))
     } finally {
       setUpdatingId(null)
+    }
+  }
+
+  // ------------------------------------------------------------------ //
+  // Upload dev model
+  // ------------------------------------------------------------------ //
+  const handleUploadDevModel = async (scan: Scan, file: File) => {
+    setUploadingDevId(scan.id)
+    const formData = new FormData()
+    formData.append('dev_model_file', file)
+    try {
+      const res = await api.patch<Scan>(`/scans/${scan.id}/upload-dev-model/`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      setScans((prev) => prev.map((s) => s.id === scan.id ? res.data : s))
+      setFiltered((prev) => prev.map((s) => s.id === scan.id ? res.data : s))
+      notifApi.success({ message: 'Dev model uploaded', description: `Case ${scan.case_number} — development preview is now visible to the doctor.` })
+    } catch {
+      notifApi.error({ message: 'Upload failed', description: 'Could not upload the development model.' })
+    } finally {
+      setUploadingDevId(null)
+    }
+  }
+
+  // ------------------------------------------------------------------ //
+  // Save admin notes
+  // ------------------------------------------------------------------ //
+  const handleSaveAdminNote = async (scan: Scan) => {
+    const note = adminNoteDrafts[scan.id] ?? scan.admin_notes
+    setSavingNoteId(scan.id)
+    try {
+      const res = await api.patch<Scan>(`/scans/${scan.id}/admin-notes/`, { admin_notes: note })
+      setScans((prev) => prev.map((s) => s.id === scan.id ? res.data : s))
+      setFiltered((prev) => prev.map((s) => s.id === scan.id ? res.data : s))
+      notifApi.success({ message: 'Notes saved', description: `Feedback sent to Dr. ${scan.doctor?.last_name}.` })
+    } catch {
+      notifApi.error({ message: 'Failed to save notes' })
+    } finally {
+      setSavingNoteId(null)
     }
   }
 
@@ -363,16 +411,34 @@ export default function AdminDashboard() {
                 <Text type="secondary" style={{ fontSize: 11 }}>Converting…</Text>
               </Space>
             ) : isDone && record.model_file ? (
-              <Button
-                size="small"
-                type="primary"
-                icon={<DownloadOutlined />}
-                href={record.model_file}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                STL
-              </Button>
+              <Space wrap>
+                <Button
+                  size="small"
+                  type="primary"
+                  icon={<DownloadOutlined />}
+                  href={record.model_file}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  STL
+                </Button>
+                <Tooltip title={record.dev_model_file ? 'Replace dev model' : 'Upload development-ready STL for doctor preview'}>
+                  <Upload
+                    accept=".stl"
+                    showUploadList={false}
+                    beforeUpload={(file) => { handleUploadDevModel(record, file); return false }}
+                  >
+                    <Button
+                      size="small"
+                      icon={uploadingDevId === record.id ? <LoadingOutlined /> : <UploadOutlined />}
+                      loading={uploadingDevId === record.id}
+                      style={{ borderColor: record.dev_model_file ? '#52c41a' : undefined, color: record.dev_model_file ? '#52c41a' : undefined }}
+                    >
+                      {record.dev_model_file ? <><ToolOutlined /> Dev ✓</> : 'Upload Dev'}
+                    </Button>
+                  </Upload>
+                </Tooltip>
+              </Space>
             ) : (
               <Popconfirm
                 title="Convert DCM → STL via 3D Slicer?"
@@ -449,6 +515,35 @@ export default function AdminDashboard() {
             <Text ellipsis style={{ maxWidth: 160 }}>{val}</Text>
           </Tooltip>
         ) : <Text type="secondary">—</Text>,
+    },
+    {
+      title: 'Admin Notes',
+      key: 'admin_notes',
+      width: 260,
+      render: (_: unknown, record: Scan) => {
+        const draft = adminNoteDrafts[record.id] ?? record.admin_notes ?? ''
+        const isDirty = draft !== (record.admin_notes ?? '')
+        return (
+          <Space.Compact style={{ width: '100%' }}>
+            <Input.TextArea
+              value={draft}
+              autoSize={{ minRows: 1, maxRows: 3 }}
+              placeholder="Write feedback for doctor…"
+              onChange={(e) =>
+                setAdminNoteDrafts((prev) => ({ ...prev, [record.id]: e.target.value }))
+              }
+            />
+            <Button
+              type={isDirty ? 'primary' : 'default'}
+              loading={savingNoteId === record.id}
+              disabled={!isDirty}
+              onClick={() => handleSaveAdminNote(record)}
+            >
+              Save
+            </Button>
+          </Space.Compact>
+        )
+      },
     },
     {
       title: 'Status',

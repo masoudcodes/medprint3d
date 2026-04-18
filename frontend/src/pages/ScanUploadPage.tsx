@@ -46,6 +46,7 @@ export default function ScanUploadPage() {
   const navigate = useNavigate()
   const [form] = Form.useForm()
   const [dicomFile, setDicomFile] = useState<UploadFile | null>(null)
+  const [extraFiles, setExtraFiles] = useState<UploadFile[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -70,6 +71,9 @@ export default function ScanUploadPage() {
     formData.append('title', values.title)
     formData.append('notes', values.notes ?? '')
     formData.append('dicom_file', dicomFile as unknown as Blob)
+    for (const f of extraFiles) {
+      formData.append('dicom_files', f as unknown as Blob)
+    }
 
     try {
       await api.post('/scans/', formData, {
@@ -78,6 +82,7 @@ export default function ScanUploadPage() {
       setSuccess(true)
       form.resetFields()
       setDicomFile(null)
+      setExtraFiles([])
       setTimeout(() => navigate('/doctor/dashboard'), 1500)
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: Record<string, string | string[]> } }
@@ -220,10 +225,10 @@ export default function ScanUploadPage() {
 
             {/* DICOM Upload */}
             <div style={{ marginBottom: 8 }}>
-              <Text strong style={{ fontSize: 15 }}>DICOM File</Text>
+              <Text strong style={{ fontSize: 15 }}>DICOM Files</Text>
             </div>
 
-            <Form.Item>
+            <Form.Item label="Primary DICOM file (required)">
               <Dragger
                 beforeUpload={beforeUpload as (file: UploadFile) => boolean}
                 maxCount={1}
@@ -234,10 +239,26 @@ export default function ScanUploadPage() {
                 <p className="ant-upload-drag-icon">
                   <InboxOutlined style={{ color: '#1677ff', fontSize: 40 }} />
                 </p>
-                <p className="ant-upload-text">Click or drag your DICOM file here</p>
+                <p className="ant-upload-text">Click or drag your primary DICOM file here</p>
                 <p className="ant-upload-hint">
                   Supports .dcm, .dicom, or .zip archive of DICOM series. Max file size 500 MB.
                 </p>
+              </Dragger>
+            </Form.Item>
+
+            <Form.Item label="Additional DICOM files (optional)">
+              <Dragger
+                beforeUpload={(file: UploadFile) => { setExtraFiles((prev) => [...prev, file]); return false }}
+                multiple
+                fileList={extraFiles}
+                onRemove={(file) => setExtraFiles((prev) => prev.filter((f) => f.uid !== file.uid))}
+                accept=".dcm,.dicom,.zip"
+              >
+                <p className="ant-upload-drag-icon">
+                  <InboxOutlined style={{ color: '#52c41a', fontSize: 36 }} />
+                </p>
+                <p className="ant-upload-text">Attach extra DICOM series or supplementary files</p>
+                <p className="ant-upload-hint">Multiple files accepted. All will be included in the conversion.</p>
               </Dragger>
             </Form.Item>
 
