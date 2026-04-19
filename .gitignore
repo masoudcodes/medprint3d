@@ -40,6 +40,7 @@ env/
 *.log
 /static/
 /media/
+backend/media/
 db.sqlite3
 db.sqlite3-journal
 /local_settings.py
@@ -58,13 +59,14 @@ npm-debug.log
 yarn-error.log
 dist/
 .next/
+.vite/
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Migrations (except initial)
-migrations/0*.py
+# Production env (never commit real secrets)
+.env.production
 
 # Local files
 *.bak

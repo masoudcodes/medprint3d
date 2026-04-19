@@ -126,7 +126,7 @@ export default function LandingPage() {
         }}
       >
         <Text strong style={{ color: '#fff', fontSize: 20, letterSpacing: 1 }}>
-          MedPrint <Text style={{ color: '#1677ff', fontSize: 20 }}>3D</Text>
+          MedTechPrint <Text style={{ color: '#1677ff', fontSize: 20 }}>3D</Text>
         </Text>
         <Space>
           <Button type="text" style={{ color: '#ccc' }}>
@@ -296,7 +296,7 @@ export default function LandingPage() {
       {/* Footer */}
       <Footer style={{ background: '#001529', color: '#aaa', textAlign: 'center', padding: '28px 40px' }}>
         <Text style={{ color: '#aaa' }}>
-          &copy; {new Date().getFullYear()} MedPrint 3D. All rights reserved.
+          &copy; {new Date().getFullYear()} MedTechPrint 3D. All rights reserved.
         </Text>
       </Footer>
     </Layout>

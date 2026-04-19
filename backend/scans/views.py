@@ -5,6 +5,24 @@ from rest_framework.permissions import IsAuthenticated
 from .models import Scan, ScanFile
 from .serializers import ScanSerializer
 
+ALLOWED_DICOM_EXT = {'.dcm', '.dicom', '.zip'}
+ALLOWED_STL_EXT = {'.stl'}
+
+
+def _check_dicom_files(files):
+    for f in files:
+        ext = '.' + f.name.rsplit('.', 1)[-1].lower()
+        if ext not in ALLOWED_DICOM_EXT:
+            return f'"{f.name}" is not allowed. Only .dcm, .dicom, and .zip files are accepted.'
+    return None
+
+
+def _check_stl_file(f):
+    ext = '.' + f.name.rsplit('.', 1)[-1].lower()
+    if ext not in ALLOWED_STL_EXT:
+        return f'"{f.name}" is not allowed. Only .stl files are accepted.'
+    return None
+
 
 class ScanViewSet(viewsets.ModelViewSet):
     serializer_class = ScanSerializer
@@ -25,6 +43,14 @@ class ScanViewSet(viewsets.ModelViewSet):
         return Scan.objects.filter(user=user)
 
     def perform_create(self, serializer):
+        all_dicom = (
+            list(self.request.FILES.getlist('dicom_file')) +
+            list(self.request.FILES.getlist('dicom_files'))
+        )
+        err = _check_dicom_files(all_dicom)
+        if err:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'dicom_file': err})
         scan = serializer.save(user=self.request.user)
         for f in self.request.FILES.getlist('dicom_files'):
             ScanFile.objects.create(scan=scan, file=f)
@@ -37,10 +63,17 @@ class ScanViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        all_dicom = (
+            list(request.FILES.getlist('dicom_file')) +
+            list(request.FILES.getlist('dicom_files'))
+        )
+        err = _check_dicom_files(all_dicom)
+        if err:
+            return Response({'error': err}, status=status.HTTP_400_BAD_REQUEST)
+
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
             scan = serializer.save(user=request.user)
-            # Save any additional DICOM files
             for f in request.FILES.getlist('dicom_files'):
                 ScanFile.objects.create(scan=scan, file=f)
             return Response(self.get_serializer(scan).data, status=status.HTTP_201_CREATED)
@@ -72,6 +105,10 @@ class ScanViewSet(viewsets.ModelViewSet):
 
         if 'dev_model_file' not in request.FILES:
             return Response({'error': 'No file provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        err = _check_stl_file(request.FILES['dev_model_file'])
+        if err:
+            return Response({'error': err}, status=status.HTTP_400_BAD_REQUEST)
 
         scan = self.get_object()
         scan.dev_model_file = request.FILES['dev_model_file']

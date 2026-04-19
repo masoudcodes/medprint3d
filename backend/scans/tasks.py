@@ -27,7 +27,7 @@ def convert_scan_to_3d_sync(scan_id: str) -> None:
     except Scan.DoesNotExist:
         return
 
-    tmp_dir = tempfile.mkdtemp(prefix='medprint_')
+    tmp_dir = tempfile.mkdtemp(prefix='medtechprint_')
     try:
         dicom_path = scan.dicom_file.path
         ext = os.path.splitext(dicom_path)[1].lower()
@@ -62,8 +62,7 @@ def convert_scan_to_3d_sync(scan_id: str) -> None:
 
         # Save STL to Django media storage
         with open(output_stl, 'rb') as f:
-            stl_filename = f'scans/models/scan_{scan_id}.stl'
-            scan.model_file.save(stl_filename, ContentFile(f.read()), save=False)
+            scan.model_file.save(f'scan_{scan_id}.stl', ContentFile(f.read()), save=False)
 
         scan.status = 'COMPLETED'
         scan.save(update_fields=['status', 'model_file', 'updated_at'])
@@ -74,7 +73,7 @@ def convert_scan_to_3d_sync(scan_id: str) -> None:
             from django.core.mail import send_mail
             doctor = scan.user
             send_mail(
-                subject=f'[MedPrint 3D] Case {scan.case_number} — 3D Model Ready',
+                subject=f'[MedTechPrint 3D] Case {scan.case_number} — 3D Model Ready',
                 message=(
                     f'Dear Dr. {doctor.first_name} {doctor.last_name},\n\n'
                     f'Your case has been processed successfully.\n\n'
@@ -82,9 +81,9 @@ def convert_scan_to_3d_sync(scan_id: str) -> None:
                     f'Patient     : {scan.patient_name}\n'
                     f'Status      : Completed\n\n'
                     f'Log in to your dashboard to download the STL file and request a print.\n\n'
-                    f'MedPrint 3D Team'
+                    f'MedTechPrint 3D Team'
                 ),
-                from_email='noreply@medprint3d.com',
+                from_email='noreply@medtechprint3d.com',
                 recipient_list=[doctor.email],
                 fail_silently=True,
             )
@@ -105,3 +104,35 @@ def convert_scan_to_3d_sync(scan_id: str) -> None:
 def convert_scan_to_3d(self, scan_id: str) -> None:
     """Celery task — delegates to the sync function."""
     convert_scan_to_3d_sync(scan_id)
+
+
+@shared_task
+def cleanup_old_scans() -> str:
+    """Delete scans (files + DB records) older than SCAN_RETENTION_DAYS."""
+    from django.conf import settings
+    from django.utils import timezone
+    from datetime import timedelta
+    from .models import Scan
+
+    retention_days = getattr(settings, 'SCAN_RETENTION_DAYS', 270)
+    cutoff = timezone.now() - timedelta(days=retention_days)
+    old_scans = Scan.objects.filter(created_at__lt=cutoff)
+    count = 0
+
+    for scan in old_scans:
+        for field in [scan.dicom_file, scan.model_file, scan.dev_model_file]:
+            if field and field.name:
+                try:
+                    field.delete(save=False)
+                except Exception:
+                    pass
+        for sf in scan.dicom_files.all():
+            if sf.file and sf.file.name:
+                try:
+                    sf.file.delete(save=False)
+                except Exception:
+                    pass
+        scan.delete()
+        count += 1
+
+    return f"Deleted {count} scans older than {retention_days} days"

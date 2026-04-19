@@ -56,7 +56,7 @@ export default function NewOrderPage() {
         }}
       >
         <Text strong style={{ color: '#fff', fontSize: 20, letterSpacing: 1 }}>
-          MedPrint <Text style={{ color: '#1677ff', fontSize: 20 }}>3D</Text>
+          MedTechPrint <Text style={{ color: '#1677ff', fontSize: 20 }}>3D</Text>
         </Text>
         <Button
           icon={<ArrowLeftOutlined />}

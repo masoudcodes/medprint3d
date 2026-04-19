@@ -89,7 +89,7 @@ export default function LoginPage() {
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <Link to="/">
             <Text strong style={{ color: '#fff', fontSize: 26, letterSpacing: 1 }}>
-              MedPrint{' '}
+              MedTechPrint{' '}
               <Text style={{ color: '#4096ff', fontSize: 26 }}>3D</Text>
             </Text>
           </Link>

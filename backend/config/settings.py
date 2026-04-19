@@ -23,6 +23,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'storages',
+    'django_celery_beat',
     'users',
     'scans',
     'orders',
@@ -160,6 +161,17 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'UTC'
+
+# Scan file retention (days) — default 270 = 9 months
+SCAN_RETENTION_DAYS = env.int('SCAN_RETENTION_DAYS', default=270)
+
+from celery.schedules import crontab
+CELERY_BEAT_SCHEDULE = {
+    'cleanup-old-scans': {
+        'task': 'scans.tasks.cleanup_old_scans',
+        'schedule': crontab(hour=2, minute=0),  # daily at 2am UTC
+    },
+}
 
 # AWS S3 (optional - for production file storage)
 if env('AWS_ACCESS_KEY_ID', default=''):

@@ -18,7 +18,7 @@ export default function STLViewer({ url, width = 600, height = 420 }: STLViewerP
 
     // Scene
     const scene = new THREE.Scene()
-    scene.background = new THREE.Color(0x1a1a2e)
+    scene.background = new THREE.Color(0x3d3d3d)
 
     // Camera
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 10000)
@@ -28,17 +28,21 @@ export default function STLViewer({ url, width = 600, height = 420 }: STLViewerP
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setSize(width, height)
     renderer.setPixelRatio(window.devicePixelRatio)
+    renderer.shadowMap.enabled = true
     mount.appendChild(renderer.domElement)
 
-    // Lights
-    const ambient = new THREE.AmbientLight(0xffffff, 0.5)
+    // Lights — soft wraparound like clinical imaging software
+    const ambient = new THREE.AmbientLight(0xffffff, 0.45)
     scene.add(ambient)
-    const dir1 = new THREE.DirectionalLight(0xffffff, 0.8)
-    dir1.position.set(1, 2, 3)
-    scene.add(dir1)
-    const dir2 = new THREE.DirectionalLight(0x8888ff, 0.4)
-    dir2.position.set(-2, -1, -1)
-    scene.add(dir2)
+    const key = new THREE.DirectionalLight(0xffffff, 0.9)
+    key.position.set(2, 3, 4)
+    scene.add(key)
+    const fill = new THREE.DirectionalLight(0xffffff, 0.4)
+    fill.position.set(-3, 1, -2)
+    scene.add(fill)
+    const rim = new THREE.DirectionalLight(0xffffff, 0.25)
+    rim.position.set(0, -3, -3)
+    scene.add(rim)
 
     // Controls
     const controls = new OrbitControls(camera, renderer.domElement)
@@ -62,9 +66,10 @@ export default function STLViewer({ url, width = 600, height = 420 }: STLViewerP
       controls.update()
 
       const material = new THREE.MeshPhongMaterial({
-        color: 0xcccccc,
-        specular: 0x111111,
-        shininess: 100,
+        color: 0xebebeb,
+        emissive: 0x1a1a1a,
+        specular: 0x2a2a2a,
+        shininess: 60,
         side: THREE.DoubleSide,
         flatShading: false,
       })

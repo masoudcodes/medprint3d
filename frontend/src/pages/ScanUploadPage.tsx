@@ -114,7 +114,7 @@ export default function ScanUploadPage() {
         }}
       >
         <Text strong style={{ color: '#fff', fontSize: 20, letterSpacing: 1 }}>
-          MedPrint <Text style={{ color: '#1677ff', fontSize: 20 }}>3D</Text>
+          MedTechPrint <Text style={{ color: '#1677ff', fontSize: 20 }}>3D</Text>
           <Text style={{ color: '#aaa', fontSize: 13, marginLeft: 12 }}>Doctor Portal</Text>
         </Text>
         <Button

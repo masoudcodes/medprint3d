@@ -331,7 +331,7 @@ export default function DoctorDashboard() {
         }}
       >
         <Text strong style={{ color: '#fff', fontSize: 20, letterSpacing: 1 }}>
-          MedPrint <Text style={{ color: '#1677ff', fontSize: 20 }}>3D</Text>
+          MedTechPrint <Text style={{ color: '#1677ff', fontSize: 20 }}>3D</Text>
           <Text style={{ color: '#aaa', fontSize: 13, marginLeft: 12 }}>Doctor Portal</Text>
         </Text>
         <Space size="middle">
@@ -449,7 +449,7 @@ export default function DoctorDashboard() {
 
       <Footer style={{ background: '#f5f7fa', textAlign: 'center', padding: '20px 32px', borderTop: '1px solid #e8e8e8' }}>
         <Text type="secondary" style={{ fontSize: 13 }}>
-          &copy; {new Date().getFullYear()} MedPrint 3D. All rights reserved.
+          &copy; {new Date().getFullYear()} MedTechPrint 3D. All rights reserved.
         </Text>
       </Footer>
 
