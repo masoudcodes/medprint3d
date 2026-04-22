@@ -102,29 +102,36 @@ def volume_to_stl(volume: np.ndarray, spacing: tuple, output_stl: str, threshold
     verts, faces, _, _ = marching_cubes(volume, level=threshold, spacing=spacing)
     print(f"[Convert] Mesh: {len(verts)} vertices, {len(faces)} faces")
 
-    # Write binary STL
+    # Write binary STL — vectorized: no Python loop over faces
     os.makedirs(os.path.dirname(os.path.abspath(output_stl)), exist_ok=True)
 
+    v0 = verts[faces[:, 0]]
+    v1 = verts[faces[:, 1]]
+    v2 = verts[faces[:, 2]]
+
+    normals = np.cross(v1 - v0, v2 - v0).astype(np.float32)
+    lengths = np.linalg.norm(normals, axis=1, keepdims=True)
+    lengths[lengths == 0] = 1.0
+    normals /= lengths
+
+    # Each triangle record: 12 floats (normal+v0+v1+v2) + 1 uint16 attribute = 50 bytes
+    n_faces = len(faces)
+    records = np.zeros(n_faces, dtype=[
+        ('normal', np.float32, (3,)),
+        ('v0',     np.float32, (3,)),
+        ('v1',     np.float32, (3,)),
+        ('v2',     np.float32, (3,)),
+        ('attr',   np.uint16),
+    ])
+    records['normal'] = normals
+    records['v0'] = v0.astype(np.float32)
+    records['v1'] = v1.astype(np.float32)
+    records['v2'] = v2.astype(np.float32)
+
     with open(output_stl, 'wb') as f:
-        # 80-byte header
         f.write(b'\0' * 80)
-        # Number of triangles
-        f.write(struct.pack('<I', len(faces)))
-        for face in faces:
-            v0, v1, v2 = verts[face[0]], verts[face[1]], verts[face[2]]
-            # Compute normal
-            edge1 = v1 - v0
-            edge2 = v2 - v0
-            normal = np.cross(edge1, edge2)
-            norm_len = np.linalg.norm(normal)
-            if norm_len > 0:
-                normal = normal / norm_len
-            # Write normal + 3 vertices + attribute
-            f.write(struct.pack('<fff', *normal))
-            f.write(struct.pack('<fff', *v0))
-            f.write(struct.pack('<fff', *v1))
-            f.write(struct.pack('<fff', *v2))
-            f.write(struct.pack('<H', 0))
+        f.write(struct.pack('<I', n_faces))
+        f.write(records.tobytes())
 
     size_mb = os.path.getsize(output_stl) / (1024 * 1024)
     print(f"[Convert] STL written: {output_stl} ({size_mb:.1f} MB)")
