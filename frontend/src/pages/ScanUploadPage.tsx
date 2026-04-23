@@ -7,6 +7,7 @@ import {
   Form,
   Input,
   Layout,
+  Progress,
   Select,
   Space,
   Typography,
@@ -48,6 +49,7 @@ export default function ScanUploadPage() {
   const [dicomFile, setDicomFile] = useState<UploadFile | null>(null)
   const [extraFiles, setExtraFiles] = useState<UploadFile[]>([])
   const [loading, setLoading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
 
@@ -78,13 +80,18 @@ export default function ScanUploadPage() {
     try {
       await api.post('/scans/', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (e) => {
+          if (e.total) setUploadProgress(Math.round((e.loaded / e.total) * 100))
+        },
       })
       setSuccess(true)
+      setUploadProgress(0)
       form.resetFields()
       setDicomFile(null)
       setExtraFiles([])
       setTimeout(() => navigate('/doctor/dashboard'), 1500)
     } catch (err: unknown) {
+      setUploadProgress(0)
       const axiosErr = err as { response?: { data?: Record<string, string | string[]> } }
       const data = axiosErr?.response?.data
       if (data) {
@@ -263,22 +270,31 @@ export default function ScanUploadPage() {
             </Form.Item>
 
             <Form.Item style={{ marginBottom: 0, marginTop: 8 }}>
-              <Space>
-                <Button
-                  type="primary"
-                  htmlType="submit"
-                  loading={loading}
-                  icon={<CloudUploadOutlined />}
-                  style={{ height: 44, paddingInline: 32 }}
-                >
-                  Submit Case
-                </Button>
-                <Button
-                  style={{ height: 44 }}
-                  onClick={() => navigate('/doctor/dashboard')}
-                >
-                  Cancel
-                </Button>
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <Space>
+                  <Button
+                    type="primary"
+                    htmlType="submit"
+                    loading={loading}
+                    icon={<CloudUploadOutlined />}
+                    style={{ height: 44, paddingInline: 32 }}
+                  >
+                    Submit Case
+                  </Button>
+                  <Button
+                    style={{ height: 44 }}
+                    onClick={() => navigate('/doctor/dashboard')}
+                  >
+                    Cancel
+                  </Button>
+                </Space>
+                {loading && uploadProgress > 0 && (
+                  <Progress
+                    percent={uploadProgress}
+                    status="active"
+                    style={{ maxWidth: 400 }}
+                  />
+                )}
               </Space>
             </Form.Item>
           </Form>

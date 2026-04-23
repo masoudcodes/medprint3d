@@ -27,6 +27,7 @@ def _check_stl_file(f):
 class ScanViewSet(viewsets.ModelViewSet):
     serializer_class = ScanSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = None
 
     def get_queryset(self):
         user = self.request.user

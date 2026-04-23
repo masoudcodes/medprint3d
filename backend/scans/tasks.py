@@ -60,6 +60,11 @@ def convert_scan_to_3d_sync(scan_id: str) -> None:
         if not os.path.exists(output_stl):
             raise RuntimeError("STL file was not produced")
 
+        # A valid STL has at least one triangle (80-byte header + 4-byte count + 50 bytes per triangle)
+        stl_size = os.path.getsize(output_stl)
+        if stl_size <= 84:
+            raise RuntimeError(f"Conversion produced an empty mesh (file size {stl_size} bytes)")
+
         # Save STL to Django media storage
         with open(output_stl, 'rb') as f:
             scan.model_file.save(f'scan_{scan_id}.stl', ContentFile(f.read()), save=False)

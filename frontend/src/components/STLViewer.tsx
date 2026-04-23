@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
@@ -11,8 +11,13 @@ interface STLViewerProps {
 
 export default function STLViewer({ url, width = 600, height = 420 }: STLViewerProps) {
   const mountRef = useRef<HTMLDivElement>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [viewerLoading, setViewerLoading] = useState(true)
 
   useEffect(() => {
+    setLoadError(null)
+    setViewerLoading(true)
+
     const mount = mountRef.current
     if (!mount) return
 
@@ -20,7 +25,7 @@ export default function STLViewer({ url, width = 600, height = 420 }: STLViewerP
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0x3d3d3d)
 
-    // Camera
+    // Camera — initial near/far are overridden once the mesh loads
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 10000)
     camera.position.set(0, 0, 300)
 
@@ -51,31 +56,42 @@ export default function STLViewer({ url, width = 600, height = 420 }: STLViewerP
 
     // Load STL
     const loader = new STLLoader()
-    loader.load(url, (geometry) => {
-      geometry.computeBoundingBox()
-      geometry.center()
+    loader.load(
+      url,
+      (geometry) => {
+        geometry.computeBoundingBox()
+        geometry.center()
 
-      const size = new THREE.Vector3()
-      geometry.boundingBox!.getSize(size)
-      const maxDim = Math.max(size.x, size.y, size.z)
-      camera.position.set(0, 0, maxDim * 1.8)
-      camera.near = maxDim * 0.01
-      camera.far = maxDim * 100
-      camera.updateProjectionMatrix()
-      controls.target.set(0, 0, 0)
-      controls.update()
+        const size = new THREE.Vector3()
+        geometry.boundingBox!.getSize(size)
+        const maxDim = Math.max(size.x, size.y, size.z)
+        // Guard against empty mesh (maxDim=0 collapses the frustum)
+        const effectiveDim = maxDim > 0 ? maxDim : 300
+        camera.position.set(0, 0, effectiveDim * 1.8)
+        camera.near = effectiveDim * 0.01
+        camera.far = effectiveDim * 100
+        camera.updateProjectionMatrix()
+        controls.target.set(0, 0, 0)
+        controls.update()
 
-      const material = new THREE.MeshPhongMaterial({
-        color: 0xebebeb,
-        emissive: 0x1a1a1a,
-        specular: 0x2a2a2a,
-        shininess: 60,
-        side: THREE.DoubleSide,
-        flatShading: false,
-      })
-      const mesh = new THREE.Mesh(geometry, material)
-      scene.add(mesh)
-    })
+        const material = new THREE.MeshPhongMaterial({
+          color: 0xebebeb,
+          emissive: 0x1a1a1a,
+          specular: 0x2a2a2a,
+          shininess: 60,
+          side: THREE.DoubleSide,
+          flatShading: false,
+        })
+        const mesh = new THREE.Mesh(geometry, material)
+        scene.add(mesh)
+        setViewerLoading(false)
+      },
+      undefined,
+      (_err) => {
+        setLoadError('Failed to load 3D model')
+        setViewerLoading(false)
+      },
+    )
 
     // Animate
     let animId: number
@@ -96,5 +112,27 @@ export default function STLViewer({ url, width = 600, height = 420 }: STLViewerP
     }
   }, [url, width, height])
 
-  return <div ref={mountRef} style={{ width, height, borderRadius: 8, overflow: 'hidden' }} />
+  return (
+    <div style={{ position: 'relative', width, height, borderRadius: 8, overflow: 'hidden' }}>
+      <div ref={mountRef} style={{ width, height }} />
+      {viewerLoading && !loadError && (
+        <div style={{
+          position: 'absolute', inset: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: '#3d3d3d', borderRadius: 8,
+        }}>
+          <span style={{ color: '#aaa', fontSize: 14 }}>Loading 3D model…</span>
+        </div>
+      )}
+      {loadError && (
+        <div style={{
+          position: 'absolute', inset: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: '#3d3d3d', borderRadius: 8,
+        }}>
+          <span style={{ color: '#ff4d4f', fontSize: 14 }}>{loadError}</span>
+        </div>
+      )}
+    </div>
+  )
 }

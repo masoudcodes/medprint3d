@@ -74,15 +74,19 @@ def load_dicom_volume(dicom_dir: str):
     elif hasattr(slices[0], 'SliceThickness'):
         spacing_z = float(slices[0].SliceThickness) or 1.0
 
-    # Filter to the most common slice shape (removes scouts/localizers with different dimensions)
+    # Decode each slice's pixel data once to avoid repeated decompression
     from collections import Counter
-    shape_counts = Counter(s.pixel_array.shape for s in slices)
+    pixel_arrays = {s: s.pixel_array for s in slices}
+
+    # Filter to the most common slice shape (removes scouts/localizers with different dimensions)
+    shape_counts = Counter(a.shape for a in pixel_arrays.values())
     dominant_shape = shape_counts.most_common(1)[0][0]
-    slices = [s for s in slices if s.pixel_array.shape == dominant_shape]
+    slices = [s for s in slices if pixel_arrays[s].shape == dominant_shape]
     print(f"[Convert] Using {len(slices)} slices with shape {dominant_shape}")
 
     # Build volume
-    volume = np.stack([s.pixel_array.astype(np.float32) for s in slices], axis=0)
+    volume = np.stack([pixel_arrays[s].astype(np.float32) for s in slices], axis=0)
+    del pixel_arrays  # free memory before marching cubes
 
     # Apply rescale slope/intercept to get HU values
     slope = float(getattr(slices[0], 'RescaleSlope', 1))
@@ -98,9 +102,18 @@ def volume_to_stl(volume: np.ndarray, spacing: tuple, output_stl: str, threshold
     """Apply marching cubes and write binary STL."""
     from skimage.measure import marching_cubes
 
-    print(f"[Convert] Running marching cubes at {threshold} HU threshold...")
-    verts, faces, _, _ = marching_cubes(volume, level=threshold, spacing=spacing)
-    print(f"[Convert] Mesh: {len(verts)} vertices, {len(faces)} faces")
+    thresholds_to_try = [threshold, 150.0, 100.0]
+    verts = faces = None
+    for t in thresholds_to_try:
+        print(f"[Convert] Running marching cubes at {t} HU threshold...")
+        verts, faces, _, _ = marching_cubes(volume, level=t, spacing=spacing)
+        print(f"[Convert] Mesh: {len(verts)} vertices, {len(faces)} faces")
+        if len(faces) > 0:
+            break
+        print(f"[Convert] No surfaces at {t} HU, retrying with lower threshold...")
+
+    if verts is None or len(faces) == 0:
+        raise ValueError("No surfaces found at any threshold (200, 150, 100 HU)")
 
     # Write binary STL — vectorized: no Python loop over faces
     os.makedirs(os.path.dirname(os.path.abspath(output_stl)), exist_ok=True)

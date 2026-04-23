@@ -102,17 +102,18 @@ export default function AdminDashboard() {
   const [adminNoteDrafts, setAdminNoteDrafts] = useState<Record<string, string>>({})
   const [savingNoteId, setSavingNoteId] = useState<string | null>(null)
   const [uploadingDevId, setUploadingDevId] = useState<string | null>(null)
+  const [doctors, setDoctors] = useState<Doctor[]>([])
 
   const scansRef = useRef<Scan[]>([])
   scansRef.current = scans
+  const fetchScansRef = useRef<() => void>(() => {})
 
   // ------------------------------------------------------------------ //
   // Fetch all scans
   // ------------------------------------------------------------------ //
-  const fetchScans = (doctorId?: string) => {
+  const fetchScans = () => {
     setLoading(true)
-    const params = doctorId ? { doctor_id: doctorId } : {}
-    api.get('/scans/', { params })
+    api.get('/scans/')
       .then((res) => {
         const data: Scan[] = res.data.results ?? res.data
         setScans(data)
@@ -121,8 +122,19 @@ export default function AdminDashboard() {
       .catch(() => { setScans([]); setFiltered([]) })
       .finally(() => setLoading(false))
   }
+  fetchScansRef.current = fetchScans
 
-  useEffect(() => { fetchScans() }, [])
+  useEffect(() => {
+    api.get('/auth/doctors/')
+      .then((res) => setDoctors(res.data))
+      .catch(() => {})
+    fetchScans()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const id = setInterval(() => fetchScansRef.current(), 30_000)
+    return () => clearInterval(id)
+  }, [])
 
   // ------------------------------------------------------------------ //
   // Poll every 5 s when any scan is PROCESSING
@@ -176,15 +188,6 @@ export default function AdminDashboard() {
     setSelectedDoctor(doctorId)
     applyDoctorFilter(scans, doctorId)
   }
-
-  const doctors: Doctor[] = Array.from(
-    new Map<string, Doctor>(
-      scans
-        .map((s) => s.doctor)
-        .filter((d): d is Doctor => !!d && typeof d.id === 'string' && d.id.length > 0)
-        .map((d): [string, Doctor] => [d.id, d])
-    ).values()
-  )
 
   // ------------------------------------------------------------------ //
   // Manual status update
@@ -682,7 +685,7 @@ export default function AdminDashboard() {
           <Button
             icon={<ReloadOutlined />}
             style={{ color: '#fff', borderColor: '#555', background: 'transparent' }}
-            onClick={() => fetchScans(selectedDoctor ?? undefined)}
+            onClick={() => fetchScans()}
           >
             Refresh
           </Button>
