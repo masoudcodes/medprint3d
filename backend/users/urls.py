@@ -6,6 +6,7 @@ from .views import (
     MeView,
     LogoutView,
     RefreshTokenView,
+    DoctorListView,
 )
 
 router = DefaultRouter()
@@ -16,4 +17,5 @@ router.register(r'refresh', RefreshTokenView, basename='refresh')
 
 urlpatterns = [
     path('login/', LoginView.as_view(), name='token_obtain_pair'),
+    path('doctors/', DoctorListView.as_view(), name='doctors'),
 ] + router.urls

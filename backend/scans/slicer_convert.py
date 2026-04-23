@@ -101,6 +101,8 @@ def volume_to_stl(volume: np.ndarray, spacing: tuple, output_stl: str, threshold
     print(f"[Convert] Running marching cubes at {threshold} HU threshold...")
     verts, faces, _, _ = marching_cubes(volume, level=threshold, spacing=spacing)
     print(f"[Convert] Mesh: {len(verts)} vertices, {len(faces)} faces")
+    if len(faces) == 0:
+        raise ValueError(f"Marching cubes produced 0 faces at {threshold} HU")
 
     # Write binary STL — vectorized: no Python loop over faces
     os.makedirs(os.path.dirname(os.path.abspath(output_stl)), exist_ok=True)
@@ -139,7 +141,17 @@ def volume_to_stl(volume: np.ndarray, spacing: tuple, output_stl: str, threshold
 
 def convert(dicom_dir: str, output_stl: str, threshold: float = 200.0):
     volume, spacing = load_dicom_volume(dicom_dir)
-    volume_to_stl(volume, spacing, output_stl, threshold)
+    # Try the requested threshold, then fall back to lower values for soft-tissue scans
+    thresholds = list(dict.fromkeys([threshold, 150.0, 100.0]))  # dedup, preserve order
+    last_exc: Exception = ValueError("No thresholds to try")
+    for t in thresholds:
+        try:
+            volume_to_stl(volume, spacing, output_stl, t)
+            return
+        except ValueError as exc:
+            print(f"[Convert] Threshold {t} HU produced no mesh ({exc}), trying lower...")
+            last_exc = exc
+    raise RuntimeError(f"No mesh produced at thresholds {thresholds}: {last_exc}")
 
 
 if __name__ == '__main__':

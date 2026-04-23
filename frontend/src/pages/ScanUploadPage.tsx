@@ -7,6 +7,7 @@ import {
   Form,
   Input,
   Layout,
+  Progress,
   Select,
   Space,
   Typography,
@@ -48,6 +49,7 @@ export default function ScanUploadPage() {
   const [dicomFile, setDicomFile] = useState<UploadFile | null>(null)
   const [extraFiles, setExtraFiles] = useState<UploadFile[]>([])
   const [loading, setLoading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
 
@@ -63,6 +65,7 @@ export default function ScanUploadPage() {
     }
 
     setLoading(true)
+    setUploadProgress(0)
     setError(null)
 
     const formData = new FormData()
@@ -78,6 +81,9 @@ export default function ScanUploadPage() {
     try {
       await api.post('/scans/', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (e) => {
+          if (e.total) setUploadProgress(Math.round((e.loaded / e.total) * 100))
+        },
       })
       setSuccess(true)
       form.resetFields()
@@ -95,6 +101,7 @@ export default function ScanUploadPage() {
       }
     } finally {
       setLoading(false)
+      setUploadProgress(0)
     }
   }
 
@@ -261,6 +268,12 @@ export default function ScanUploadPage() {
                 <p className="ant-upload-hint">Multiple files accepted. All will be included in the conversion.</p>
               </Dragger>
             </Form.Item>
+
+            {loading && uploadProgress > 0 && (
+              <Form.Item style={{ marginBottom: 16 }}>
+                <Progress percent={uploadProgress} status="active" />
+              </Form.Item>
+            )}
 
             <Form.Item style={{ marginBottom: 0, marginTop: 8 }}>
               <Space>

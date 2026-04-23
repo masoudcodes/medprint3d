@@ -94,6 +94,7 @@ export default function AdminDashboard() {
 
   const [scans, setScans] = useState<Scan[]>([])
   const [filtered, setFiltered] = useState<Scan[]>([])
+  const [doctors, setDoctors] = useState<Doctor[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedDoctor, setSelectedDoctor] = useState<string | null>(null)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
@@ -105,24 +106,38 @@ export default function AdminDashboard() {
 
   const scansRef = useRef<Scan[]>([])
   scansRef.current = scans
+  const selectedDoctorRef = useRef<string | null>(null)
+  selectedDoctorRef.current = selectedDoctor
 
   // ------------------------------------------------------------------ //
-  // Fetch all scans
+  // Fetch all scans (always fetches all; filter applied client-side)
   // ------------------------------------------------------------------ //
-  const fetchScans = (doctorId?: string) => {
+  const fetchScans = () => {
     setLoading(true)
-    const params = doctorId ? { doctor_id: doctorId } : {}
-    api.get('/scans/', { params })
+    api.get('/scans/')
       .then((res) => {
         const data: Scan[] = res.data.results ?? res.data
         setScans(data)
-        applyDoctorFilter(data, selectedDoctor)
+        applyDoctorFilter(data, selectedDoctorRef.current)
       })
       .catch(() => { setScans([]); setFiltered([]) })
       .finally(() => setLoading(false))
   }
 
   useEffect(() => { fetchScans() }, [])
+
+  // Fetch doctor list from API (not derived from scans, so all doctors appear)
+  useEffect(() => {
+    api.get('/auth/doctors/')
+      .then((res) => setDoctors(res.data))
+      .catch(() => {})
+  }, [])
+
+  // Auto-refresh every 30 s to catch new uploads
+  useEffect(() => {
+    const interval = setInterval(fetchScans, 30000)
+    return () => clearInterval(interval)
+  }, [])
 
   // ------------------------------------------------------------------ //
   // Poll every 5 s when any scan is PROCESSING
@@ -177,14 +192,6 @@ export default function AdminDashboard() {
     applyDoctorFilter(scans, doctorId)
   }
 
-  const doctors: Doctor[] = Array.from(
-    new Map<string, Doctor>(
-      scans
-        .map((s) => s.doctor)
-        .filter((d): d is Doctor => !!d && typeof d.id === 'string' && d.id.length > 0)
-        .map((d): [string, Doctor] => [d.id, d])
-    ).values()
-  )
 
   // ------------------------------------------------------------------ //
   // Manual status update
@@ -682,7 +689,7 @@ export default function AdminDashboard() {
           <Button
             icon={<ReloadOutlined />}
             style={{ color: '#fff', borderColor: '#555', background: 'transparent' }}
-            onClick={() => fetchScans(selectedDoctor ?? undefined)}
+            onClick={() => fetchScans()}
           >
             Refresh
           </Button>

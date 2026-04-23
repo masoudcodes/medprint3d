@@ -75,10 +75,24 @@ class LogoutView(viewsets.ViewSet):
 
 class RefreshTokenView(viewsets.ViewSet):
     permission_classes = (AllowAny,)
-    
+
     def create(self, request):
         serializer = RefreshTokenSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         refresh = RefreshToken(serializer.validated_data['refresh'])
         return Response({'access': str(refresh.access_token)}, status=status.HTTP_200_OK)
+
+
+class DoctorListView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        if request.user.role != 'ADMIN':
+            return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+        doctors = User.objects.filter(role='DOCTOR').order_by('last_name', 'first_name')
+        data = [
+            {'id': str(u.id), 'email': u.email, 'first_name': u.first_name, 'last_name': u.last_name}
+            for u in doctors
+        ]
+        return Response(data)
