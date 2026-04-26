@@ -5,11 +5,11 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 
 interface STLViewerProps {
   url: string
-  width?: number
   height?: number
+  width?: number  // treated as max-width; actual width fills the container
 }
 
-export default function STLViewer({ url, width = 600, height = 420 }: STLViewerProps) {
+export default function STLViewer({ url, height = 420 }: STLViewerProps) {
   const mountRef = useRef<HTMLDivElement>(null)
   const [loadState, setLoadState] = useState<'loading' | 'loaded' | 'error'>('loading')
 
@@ -18,14 +18,18 @@ export default function STLViewer({ url, width = 600, height = 420 }: STLViewerP
     const mount = mountRef.current
     if (!mount) return
 
+    // Measure container — handles modal / responsive contexts automatically
+    const width = mount.clientWidth || 600
+    const actualHeight = Math.min(height, Math.round(width * 0.7))
+
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0x3d3d3d)
 
-    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 10000)
+    const camera = new THREE.PerspectiveCamera(45, width / actualHeight, 0.1, 10000)
     camera.position.set(0, 0, 300)
 
     const renderer = new THREE.WebGLRenderer({ antialias: true })
-    renderer.setSize(width, height)
+    renderer.setSize(width, actualHeight)
     renderer.setPixelRatio(window.devicePixelRatio)
     renderer.shadowMap.enabled = true
     mount.appendChild(renderer.domElement)
@@ -96,11 +100,11 @@ export default function STLViewer({ url, width = 600, height = 420 }: STLViewerP
         mount.removeChild(renderer.domElement)
       }
     }
-  }, [url, width, height])
+  }, [url, height])
 
   return (
-    <div style={{ position: 'relative', width, height, borderRadius: 8, overflow: 'hidden' }}>
-      <div ref={mountRef} style={{ width, height }} />
+    <div style={{ position: 'relative', width: '100%', height, borderRadius: 8, overflow: 'hidden' }}>
+      <div ref={mountRef} style={{ width: '100%', height }} />
       {loadState === 'loading' && (
         <div style={{
           position: 'absolute', inset: 0,

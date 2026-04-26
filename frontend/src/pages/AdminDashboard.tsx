@@ -675,7 +675,7 @@ export default function AdminDashboard() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 32px',
+          padding: '0 16px',
           position: 'sticky',
           top: 0,
           zIndex: 100,
@@ -701,7 +701,7 @@ export default function AdminDashboard() {
         </Space>
       </Header>
 
-      <Content style={{ padding: '36px 32px', maxWidth: 1500, margin: '0 auto', width: '100%' }}>
+      <Content style={{ padding: 'clamp(12px, 3vw, 36px) clamp(12px, 3vw, 32px)', maxWidth: 1500, margin: '0 auto', width: '100%' }}>
         {/* Welcome Banner */}
         <div
           style={{

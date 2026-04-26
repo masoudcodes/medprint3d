@@ -1,0 +1,41 @@
+*, *::before, *::after { box-sizing: border-box; }
+
+/* Responsive layout padding */
+@media (max-width: 767px) {
+  .ant-layout-header {
+    padding: 0 16px !important;
+  }
+  .ant-layout-content {
+    padding: 16px 12px !important;
+  }
+  .ant-card-body {
+    padding: 16px !important;
+  }
+}
+
+/* Tables scroll horizontally on mobile */
+.ant-table-wrapper {
+  overflow-x: auto;
+}
+
+/* Modals never overflow the viewport */
+.ant-modal {
+  max-width: calc(100vw - 24px) !important;
+}
+.ant-modal-content {
+  padding: 16px !important;
+}
+@media (max-width: 767px) {
+  .ant-modal-content {
+    padding: 12px !important;
+  }
+}
+
+/* Welcome banner text scales down on mobile */
+@media (max-width: 480px) {
+  .welcome-banner-title {
+    font-size: 18px !important;
+  }
+}
+
+/* Stat cards — 2-up on mobile, 4-up on desktop (handled by Ant xs/sm cols) */

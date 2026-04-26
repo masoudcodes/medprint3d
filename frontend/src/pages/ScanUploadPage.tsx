@@ -114,7 +114,7 @@ export default function ScanUploadPage() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 32px',
+          padding: '0 16px',
           position: 'sticky',
           top: 0,
           zIndex: 100,
@@ -133,7 +133,7 @@ export default function ScanUploadPage() {
         </Button>
       </Header>
 
-      <Content style={{ padding: '40px 32px', maxWidth: 800, margin: '0 auto', width: '100%' }}>
+      <Content style={{ padding: 'clamp(16px, 3vw, 40px) clamp(12px, 3vw, 32px)', maxWidth: 800, margin: '0 auto', width: '100%' }}>
         <div style={{ marginBottom: 28 }}>
           <Title level={3} style={{ margin: 0 }}>
             <CloudUploadOutlined style={{ color: '#1677ff', marginRight: 10 }} />

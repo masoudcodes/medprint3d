@@ -324,15 +324,15 @@ export default function DoctorDashboard() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 32px',
+          padding: '0 16px',
           position: 'sticky',
           top: 0,
           zIndex: 100,
         }}
       >
-        <Text strong style={{ color: '#fff', fontSize: 20, letterSpacing: 1 }}>
-          MedTechPrint <Text style={{ color: '#1677ff', fontSize: 20 }}>3D</Text>
-          <Text style={{ color: '#aaa', fontSize: 13, marginLeft: 12 }}>Doctor Portal</Text>
+        <Text strong style={{ color: '#fff', fontSize: 18, letterSpacing: 1 }}>
+          MedTechPrint <Text style={{ color: '#1677ff', fontSize: 18 }}>3D</Text>
+          <Text style={{ color: '#aaa', fontSize: 12, marginLeft: 8, display: 'none' }} className="portal-label">Doctor Portal</Text>
         </Text>
         <Space size="middle">
           <Button
@@ -350,13 +350,13 @@ export default function DoctorDashboard() {
         </Space>
       </Header>
 
-      <Content style={{ padding: '36px 32px', maxWidth: 1200, margin: '0 auto', width: '100%' }}>
+      <Content style={{ padding: 'clamp(12px, 3vw, 36px) clamp(12px, 3vw, 32px)', maxWidth: 1200, margin: '0 auto', width: '100%' }}>
         {/* Welcome Banner */}
         <div
           style={{
             background: 'linear-gradient(135deg, #001529 0%, #003a70 60%, #005eb8 100%)',
             borderRadius: 16,
-            padding: '28px 36px',
+            padding: 'clamp(16px, 3vw, 28px) clamp(16px, 4vw, 36px)',
             marginBottom: 28,
             display: 'flex',
             alignItems: 'center',
@@ -464,11 +464,11 @@ export default function DoctorDashboard() {
         open={!!previewScan}
         onCancel={() => setPreviewScan(null)}
         footer={<Button onClick={() => setPreviewScan(null)}>Close</Button>}
-        width={680}
+        width="min(680px, 95vw)"
         destroyOnHidden
       >
         {previewScan?.model_file && (
-          <STLViewer url={previewScan.model_file} width={628} height={420} />
+          <STLViewer url={previewScan.model_file} height={Math.min(420, window.innerHeight * 0.5)} />
         )}
       </Modal>
 
@@ -483,11 +483,11 @@ export default function DoctorDashboard() {
         open={!!devPreviewScan}
         onCancel={() => setDevPreviewScan(null)}
         footer={<Button onClick={() => setDevPreviewScan(null)}>Close</Button>}
-        width={680}
+        width="min(680px, 95vw)"
         destroyOnHidden
       >
         {devPreviewScan?.dev_model_file && (
-          <STLViewer url={devPreviewScan.dev_model_file} width={628} height={420} />
+          <STLViewer url={devPreviewScan.dev_model_file} height={Math.min(420, window.innerHeight * 0.5)} />
         )}
       </Modal>
 
