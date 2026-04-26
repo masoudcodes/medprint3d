@@ -20,6 +20,7 @@ import {
   InboxOutlined,
 } from '@ant-design/icons'
 import api from '../services/apiService'
+import AppLogo from '../components/AppLogo'
 
 const { Header, Content } = Layout
 const { Title, Text, Paragraph } = Typography
@@ -120,10 +121,7 @@ export default function ScanUploadPage() {
           zIndex: 100,
         }}
       >
-        <Text strong style={{ color: '#fff', fontSize: 20, letterSpacing: 1 }}>
-          MedTechPrint <Text style={{ color: '#1677ff', fontSize: 20 }}>3D</Text>
-          <Text style={{ color: '#aaa', fontSize: 13, marginLeft: 12 }}>Doctor Portal</Text>
-        </Text>
+        <AppLogo linkTo="/doctor/dashboard" />
         <Button
           icon={<ArrowLeftOutlined />}
           style={{ color: '#fff', borderColor: '#555', background: 'transparent' }}

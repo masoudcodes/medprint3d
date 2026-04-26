@@ -19,6 +19,7 @@ import {
   SettingOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons'
+import AppLogo from '../components/AppLogo'
 
 const { Header, Content, Footer } = Layout
 const { Title, Paragraph, Text } = Typography
@@ -119,20 +120,18 @@ export default function LandingPage() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 40px',
+          padding: '0 24px',
           position: 'sticky',
           top: 0,
           zIndex: 100,
         }}
       >
-        <Text strong style={{ color: '#fff', fontSize: 20, letterSpacing: 1 }}>
-          MedTechPrint <Text style={{ color: '#1677ff', fontSize: 20 }}>3D</Text>
-        </Text>
+        <AppLogo linkTo="/" />
         <Space>
-          <Button type="text" style={{ color: '#ccc' }}>
+          <Button type="text" style={{ color: '#ccc' }} className="nav-link-desktop">
             Services
           </Button>
-          <Button type="text" style={{ color: '#ccc' }}>
+          <Button type="text" style={{ color: '#ccc' }} className="nav-link-desktop">
             How it Works
           </Button>
           <Button type="primary" href="/login">
@@ -144,6 +143,7 @@ export default function LandingPage() {
       <Content>
         {/* Hero Section */}
         <div
+          className="hero-section"
           style={{
             background: 'linear-gradient(135deg, #001529 0%, #003a70 60%, #005eb8 100%)',
             padding: '100px 40px',
@@ -154,10 +154,11 @@ export default function LandingPage() {
           <Tag color="blue" style={{ marginBottom: 16, fontSize: 13 }}>
             Medical-Grade 3D Printing
           </Tag>
-          <Title style={{ color: '#fff', fontSize: 48, margin: '0 auto 20px', maxWidth: 700 }}>
+          <Title className="hero-title" style={{ color: '#fff', fontSize: 48, margin: '0 auto 20px', maxWidth: 700 }}>
             From CT Scan to Surgical-Ready in Days
           </Title>
           <Paragraph
+            className="hero-sub"
             style={{
               color: '#b0c8e8',
               fontSize: 18,
@@ -195,21 +196,22 @@ export default function LandingPage() {
             </Paragraph>
           </div>
 
-          <Row gutter={[24, 24]} justify="center" style={{ maxWidth: 1200, margin: '0 auto' }}>
+          <Row gutter={[16, 16]} justify="center" style={{ maxWidth: 1200, margin: '0 auto' }}>
             {services.map((service) => (
-              <Col key={service.key} xs={24} sm={12} lg={8}>
+              <Col key={service.key} xs={8} sm={8} lg={8}>
                 <Card
                   hoverable
                   style={{ height: '100%', borderRadius: 12 }}
-                  styles={{ body: { padding: 28 } }}
+                  styles={{ body: { padding: 'clamp(12px, 2vw, 28px)' } }}
+                  className="service-card"
                 >
-                  <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                  <Space direction="vertical" size={12} style={{ width: '100%' }}>
                     <div
                       style={{
                         background: '#f0f5ff',
-                        borderRadius: 12,
-                        width: 64,
-                        height: 64,
+                        borderRadius: 10,
+                        width: 'clamp(36px, 6vw, 64px)',
+                        height: 'clamp(36px, 6vw, 64px)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -218,26 +220,23 @@ export default function LandingPage() {
                       {service.icon}
                     </div>
                     <div>
-                      <Space align="center" style={{ marginBottom: 6 }}>
-                        <Text strong style={{ fontSize: 17 }}>
+                      <div style={{ marginBottom: 4 }}>
+                        <Text strong style={{ fontSize: 'clamp(12px, 1.4vw, 17px)', display: 'block' }}>
                           {service.title}
                         </Text>
-                        <Tag color={service.tagColor}>{service.tag}</Tag>
-                      </Space>
-                      <Paragraph type="secondary" style={{ margin: 0, fontSize: 14 }}>
+                        <Tag color={service.tagColor} style={{ marginTop: 4, fontSize: 11 }}>{service.tag}</Tag>
+                      </div>
+                      <Paragraph type="secondary" style={{ margin: 0, fontSize: 'clamp(11px, 1.1vw, 14px)' }} className="service-desc">
                         {service.description}
                       </Paragraph>
                     </div>
-                    <ul style={{ margin: 0, paddingLeft: 18, color: '#555' }}>
+                    <ul style={{ margin: 0, paddingLeft: 16, color: '#555' }} className="service-highlights">
                       {service.highlights.map((h) => (
-                        <li key={h} style={{ fontSize: 13, marginBottom: 4 }}>
+                        <li key={h} style={{ fontSize: 'clamp(10px, 1vw, 13px)', marginBottom: 3 }}>
                           {h}
                         </li>
                       ))}
                     </ul>
-                    <Button type="link" style={{ padding: 0 }}>
-                      Learn more &rarr;
-                    </Button>
                   </Space>
                 </Card>
               </Col>

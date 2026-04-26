@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useDispatch } from 'react-redux'
 import { useNavigate, Link } from 'react-router-dom'
+import AppLogo from '../components/AppLogo'
 import {
   Alert,
   Button,
@@ -87,13 +88,8 @@ export default function LoginPage() {
       <div style={{ width: '100%', maxWidth: 420 }}>
         {/* Logo / Brand */}
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <Link to="/">
-            <Text strong style={{ color: '#fff', fontSize: 26, letterSpacing: 1 }}>
-              MedTechPrint{' '}
-              <Text style={{ color: '#4096ff', fontSize: 26 }}>3D</Text>
-            </Text>
-          </Link>
-          <Paragraph style={{ color: '#b0c8e8', marginTop: 6, marginBottom: 0 }}>
+          <AppLogo size={34} linkTo="/" />
+          <Paragraph style={{ color: '#b0c8e8', marginTop: 10, marginBottom: 0 }}>
             Sign in to your account
           </Paragraph>
         </div>

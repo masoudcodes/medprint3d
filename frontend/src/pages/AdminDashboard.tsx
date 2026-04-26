@@ -45,6 +45,7 @@ import type { MenuProps } from 'antd'
 import { clearCredentials } from '../store/authSlice'
 import type { RootState } from '../store/store'
 import api from '../services/apiService'
+import AppLogo from '../components/AppLogo'
 
 const { Header, Content, Footer } = Layout
 const { Title, Text, Link } = Typography
@@ -681,10 +682,7 @@ export default function AdminDashboard() {
           zIndex: 100,
         }}
       >
-        <Text strong style={{ color: '#fff', fontSize: 20, letterSpacing: 1 }}>
-          MedTechPrint <Text style={{ color: '#1677ff', fontSize: 20 }}>3D</Text>
-          <Text style={{ color: '#aaa', fontSize: 13, marginLeft: 12 }}>Admin Portal</Text>
-        </Text>
+        <AppLogo linkTo="/admin/dashboard" />
         <Space size="middle">
           <Button
             icon={<ReloadOutlined />}

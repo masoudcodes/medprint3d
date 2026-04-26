@@ -37,6 +37,7 @@ import {
   UserOutlined,
 } from '@ant-design/icons'
 import STLViewer from '../components/STLViewer'
+import AppLogo from '../components/AppLogo'
 import type { MenuProps } from 'antd'
 import { clearCredentials } from '../store/authSlice'
 import type { RootState } from '../store/store'
@@ -330,10 +331,7 @@ export default function DoctorDashboard() {
           zIndex: 100,
         }}
       >
-        <Text strong style={{ color: '#fff', fontSize: 18, letterSpacing: 1 }}>
-          MedTechPrint <Text style={{ color: '#1677ff', fontSize: 18 }}>3D</Text>
-          <Text style={{ color: '#aaa', fontSize: 12, marginLeft: 8, display: 'none' }} className="portal-label">Doctor Portal</Text>
-        </Text>
+        <AppLogo linkTo="/doctor/dashboard" />
         <Space size="middle">
           <Button
             type="primary"

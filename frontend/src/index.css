@@ -2,9 +2,6 @@
 
 /* Responsive layout padding */
 @media (max-width: 767px) {
-  .ant-layout-header {
-    padding: 0 16px !important;
-  }
   .ant-layout-content {
     padding: 16px 12px !important;
   }
@@ -31,11 +28,37 @@
   }
 }
 
-/* Welcome banner text scales down on mobile */
-@media (max-width: 480px) {
-  .welcome-banner-title {
-    font-size: 18px !important;
+/* Landing page: hide text nav links on mobile, keep Sign In */
+@media (max-width: 640px) {
+  .nav-link-desktop {
+    display: none !important;
   }
 }
 
-/* Stat cards — 2-up on mobile, 4-up on desktop (handled by Ant xs/sm cols) */
+/* Hero section: scale title and paragraph on small screens */
+@media (max-width: 640px) {
+  .hero-title {
+    font-size: 28px !important;
+    line-height: 1.25 !important;
+  }
+  .hero-sub {
+    font-size: 15px !important;
+  }
+  .hero-section {
+    padding: 56px 16px !important;
+  }
+  .services-section {
+    padding: 48px 12px !important;
+  }
+  .section-inner {
+    padding: 48px 24px !important;
+  }
+}
+
+/* Service cards: hide description on very small screens to keep 3-col layout readable */
+@media (max-width: 480px) {
+  .service-desc,
+  .service-highlights {
+    display: none !important;
+  }
+}
