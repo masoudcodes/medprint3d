@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js'
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { TrackballControls } from 'three/examples/jsm/controls/TrackballControls.js'
 
 interface STLViewerProps {
   url: string
@@ -47,9 +47,13 @@ export default function STLViewer({ url, height = 420 }: STLViewerProps) {
     rim.position.set(0, -3, -3)
     scene.add(rim)
 
-    const controls = new OrbitControls(camera, renderer.domElement)
-    controls.enableDamping = true
-    controls.dampingFactor = 0.08
+    // TrackballControls: fully free rotation with no gimbal lock at poles.
+    // Unlike OrbitControls, it lets you flip the model and see top/bottom freely.
+    const controls = new TrackballControls(camera, renderer.domElement)
+    controls.rotateSpeed = 3.0
+    controls.zoomSpeed = 1.2
+    controls.panSpeed = 0.8
+    controls.dynamicDampingFactor = 0.15
 
     const loader = new STLLoader()
     loader.load(
@@ -66,7 +70,6 @@ export default function STLViewer({ url, height = 420 }: STLViewerProps) {
         camera.near = effectiveDim * 0.01
         camera.far = effectiveDim * 100
         camera.updateProjectionMatrix()
-        controls.target.set(0, 0, 0)
         controls.update()
 
         const material = new THREE.MeshPhongMaterial({
