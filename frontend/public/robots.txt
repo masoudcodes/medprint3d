@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /doctor/
+Disallow: /admin/
+Disallow: /login
+Disallow: /register
+
+Sitemap: https://medtechprint3d.com/sitemap.xml
