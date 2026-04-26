@@ -74,15 +74,19 @@ def load_dicom_volume(dicom_dir: str):
     elif hasattr(slices[0], 'SliceThickness'):
         spacing_z = float(slices[0].SliceThickness) or 1.0
 
-    # Filter to the most common slice shape (removes scouts/localizers with different dimensions)
+    # Decode pixel data once per slice — pixel_array decompresses raw bytes each call
     from collections import Counter
-    shape_counts = Counter(s.pixel_array.shape for s in slices)
+    pixel_arrays = [(s, s.pixel_array) for s in slices]
+
+    # Filter to the most common slice shape (removes scouts/localizers)
+    shape_counts = Counter(arr.shape for _, arr in pixel_arrays)
     dominant_shape = shape_counts.most_common(1)[0][0]
-    slices = [s for s in slices if s.pixel_array.shape == dominant_shape]
+    filtered = [(s, arr) for s, arr in pixel_arrays if arr.shape == dominant_shape]
+    slices = [s for s, _ in filtered]
     print(f"[Convert] Using {len(slices)} slices with shape {dominant_shape}")
 
     # Build volume
-    volume = np.stack([s.pixel_array.astype(np.float32) for s in slices], axis=0)
+    volume = np.stack([arr.astype(np.float32) for _, arr in filtered], axis=0)
 
     # Apply rescale slope/intercept to get HU values
     slope = float(getattr(slices[0], 'RescaleSlope', 1))
@@ -141,6 +145,14 @@ def volume_to_stl(volume: np.ndarray, spacing: tuple, output_stl: str, threshold
 
 def convert(dicom_dir: str, output_stl: str, threshold: float = 200.0):
     volume, spacing = load_dicom_volume(dicom_dir)
+
+    # Downsample XY by 2x — CT is typically 512x512 but printers don't need that resolution.
+    # Reduces voxel count by 4x, making marching cubes ~4-8x faster.
+    if volume.shape[1] > 256 or volume.shape[2] > 256:
+        volume = volume[:, ::2, ::2]
+        spacing = (spacing[0], spacing[1] * 2, spacing[2] * 2)
+        print(f"[Convert] Downsampled to {volume.shape} for faster marching cubes")
+
     # Try the requested threshold, then fall back to lower values for soft-tissue scans
     thresholds = list(dict.fromkeys([threshold, 150.0, 100.0]))  # dedup, preserve order
     last_exc: Exception = ValueError("No thresholds to try")
