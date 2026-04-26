@@ -128,10 +128,20 @@ export default function LandingPage() {
       >
         <AppLogo linkTo="/" />
         <Space>
-          <Button type="text" style={{ color: '#ccc' }} className="nav-link-desktop">
+          <Button
+            type="text"
+            style={{ color: '#ccc' }}
+            className="nav-link-desktop"
+            onClick={() => document.getElementById('services')?.scrollIntoView({ behavior: 'smooth' })}
+          >
             Services
           </Button>
-          <Button type="text" style={{ color: '#ccc' }} className="nav-link-desktop">
+          <Button
+            type="text"
+            style={{ color: '#ccc' }}
+            className="nav-link-desktop"
+            onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}
+          >
             How it Works
           </Button>
           <Button type="primary" href="/login">
@@ -198,7 +208,7 @@ export default function LandingPage() {
 
           <Row gutter={[16, 16]} justify="center" style={{ maxWidth: 1200, margin: '0 auto' }}>
             {services.map((service) => (
-              <Col key={service.key} xs={8} sm={8} lg={8}>
+              <Col key={service.key} xs={12} sm={8} lg={8}>
                 <Card
                   hoverable
                   style={{ height: '100%', borderRadius: 12 }}
