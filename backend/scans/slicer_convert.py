@@ -103,7 +103,7 @@ def volume_to_stl(volume: np.ndarray, spacing: tuple, output_stl: str, threshold
     from skimage.measure import marching_cubes
 
     print(f"[Convert] Running marching cubes at {threshold} HU threshold...")
-    verts, faces, _, _ = marching_cubes(volume, level=threshold, spacing=spacing, step_size=2, allow_degenerate=False)
+    verts, faces, _, _ = marching_cubes(volume, level=threshold, spacing=spacing)
     print(f"[Convert] Mesh: {len(verts)} vertices, {len(faces)} faces")
     if len(faces) == 0:
         raise ValueError(f"Marching cubes produced 0 faces at {threshold} HU")
@@ -152,13 +152,6 @@ def convert(dicom_dir: str, output_stl: str, threshold: float = 200.0):
         zz, yy, xx = np.where(air_mask)
         volume = volume[zz.min():zz.max()+1, yy.min():yy.max()+1, xx.min():xx.max()+1]
         print(f"[Convert] Cropped to {volume.shape} (removed air margins)")
-
-    # Downsample XY by 2x — CT is typically 512x512 but printers don't need that resolution.
-    # Reduces voxel count by 4x, making marching cubes ~4-8x faster.
-    if volume.shape[1] > 256 or volume.shape[2] > 256:
-        volume = volume[:, ::2, ::2]
-        spacing = (spacing[0], spacing[1] * 2, spacing[2] * 2)
-        print(f"[Convert] Downsampled to {volume.shape} for faster marching cubes")
 
     # Try the requested threshold, then fall back to lower values for soft-tissue scans
     thresholds = list(dict.fromkeys([threshold, 150.0, 100.0]))  # dedup, preserve order
