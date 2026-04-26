@@ -9,7 +9,7 @@ export default function AppLogo({ size = 30, linkTo }: AppLogoProps) {
   const inner = (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap', textDecoration: 'none' }}>
       <img
-        src="/favicon.svg"
+        src={`/favicon.svg?v=2`}
         alt="MedTechPrint 3D"
         style={{ width: size, height: size, borderRadius: Math.round(size * 0.22), flexShrink: 0 }}
       />
