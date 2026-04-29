@@ -6,7 +6,7 @@ import { TrackballControls } from 'three/examples/jsm/controls/TrackballControls
 interface STLViewerProps {
   url: string
   height?: number
-  width?: number  // treated as max-width; actual width fills the container
+  width?: number
 }
 
 export default function STLViewer({ url, height = 420 }: STLViewerProps) {
@@ -18,37 +18,43 @@ export default function STLViewer({ url, height = 420 }: STLViewerProps) {
     const mount = mountRef.current
     if (!mount) return
 
-    // Measure container — handles modal / responsive contexts automatically
     const width = mount.clientWidth || 600
     const actualHeight = Math.min(height, Math.round(width * 0.7))
 
+    // Dark clinical background like 3D Slicer / OsiriX
     const scene = new THREE.Scene()
-    scene.background = new THREE.Color(0x3d3d3d)
+    scene.background = new THREE.Color(0x111827)
 
-    const camera = new THREE.PerspectiveCamera(45, width / actualHeight, 0.1, 10000)
-    camera.position.set(0, 0, 300)
+    const camera = new THREE.PerspectiveCamera(35, width / actualHeight, 0.1, 100000)
 
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setSize(width, actualHeight)
-    renderer.setPixelRatio(window.devicePixelRatio)
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.shadowMap.enabled = true
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap
     mount.appendChild(renderer.domElement)
 
-    // Lights — soft wraparound like clinical imaging software
-    const ambient = new THREE.AmbientLight(0xffffff, 0.45)
-    scene.add(ambient)
-    const key = new THREE.DirectionalLight(0xffffff, 0.9)
-    key.position.set(2, 3, 4)
+    // Hemisphere light for soft ambient — sky blue top, warm ground
+    const hemi = new THREE.HemisphereLight(0xddeeff, 0x221100, 0.7)
+    scene.add(hemi)
+
+    // Key light with shadow
+    const key = new THREE.DirectionalLight(0xffffff, 1.3)
+    key.position.set(5, 8, 6)
+    key.castShadow = true
+    key.shadow.mapSize.set(1024, 1024)
     scene.add(key)
-    const fill = new THREE.DirectionalLight(0xffffff, 0.4)
-    fill.position.set(-3, 1, -2)
+
+    // Cool fill from left — gives clinical blue tint in shadows
+    const fill = new THREE.DirectionalLight(0x99bbff, 0.5)
+    fill.position.set(-6, 2, -4)
     scene.add(fill)
+
+    // Rim from below/back — adds depth separation from background
     const rim = new THREE.DirectionalLight(0xffffff, 0.25)
-    rim.position.set(0, -3, -3)
+    rim.position.set(0, -5, -5)
     scene.add(rim)
 
-    // TrackballControls: fully free rotation with no gimbal lock at poles.
-    // Unlike OrbitControls, it lets you flip the model and see top/bottom freely.
     const controls = new TrackballControls(camera, renderer.domElement)
     controls.rotateSpeed = 3.0
     controls.zoomSpeed = 1.2
@@ -59,28 +65,36 @@ export default function STLViewer({ url, height = 420 }: STLViewerProps) {
     loader.load(
       url,
       (geometry) => {
+        // Compute smooth vertex normals — eliminates jagged faceted look
+        geometry.computeVertexNormals()
         geometry.computeBoundingBox()
         geometry.center()
 
         const size = new THREE.Vector3()
         geometry.boundingBox!.getSize(size)
-        const maxDim = Math.max(size.x, size.y, size.z)
-        const effectiveDim = maxDim > 0 ? maxDim : 300
-        camera.position.set(0, 0, effectiveDim * 1.8)
-        camera.near = effectiveDim * 0.01
-        camera.far = effectiveDim * 100
+        const maxDim = Math.max(size.x, size.y, size.z) || 300
+
+        // Fit camera to show full model
+        const fov = camera.fov * (Math.PI / 180)
+        const fitDist = (maxDim / 2) / Math.tan(fov / 2) * 1.8
+        camera.position.set(fitDist * 0.5, fitDist * 0.35, fitDist)
+        camera.near = maxDim * 0.001
+        camera.far = maxDim * 200
         camera.updateProjectionMatrix()
         controls.update()
 
-        const material = new THREE.MeshPhongMaterial({
-          color: 0xebebeb,
-          emissive: 0x1a1a1a,
-          specular: 0x2a2a2a,
-          shininess: 60,
+        // Bone/ivory — standard clinical 3D reconstruction color
+        const material = new THREE.MeshStandardMaterial({
+          color: 0xf2e8d9,
+          roughness: 0.6,
+          metalness: 0.05,
           side: THREE.DoubleSide,
-          flatShading: false,
         })
-        scene.add(new THREE.Mesh(geometry, material))
+
+        const mesh = new THREE.Mesh(geometry, material)
+        mesh.castShadow = true
+        mesh.receiveShadow = true
+        scene.add(mesh)
         setLoadState('loaded')
       },
       undefined,
@@ -111,17 +125,22 @@ export default function STLViewer({ url, height = 420 }: STLViewerProps) {
       {loadState === 'loading' && (
         <div style={{
           position: 'absolute', inset: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(61,61,61,0.75)', color: '#fff', fontSize: 14,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          background: '#111827', color: '#6b7fa3', gap: 12, fontSize: 14,
         }}>
-          Loading 3D model…
+          <div style={{
+            width: 36, height: 36, border: '3px solid #1e3a5f', borderTopColor: '#5b9bd5',
+            borderRadius: '50%', animation: 'spin 0.9s linear infinite',
+          }} />
+          <span>Loading 3D model…</span>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
       )}
       {loadState === 'error' && (
         <div style={{
           position: 'absolute', inset: 0,
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          background: '#3d3d3d', color: '#ff4d4f', gap: 8,
+          background: '#111827', color: '#ff6b6b', gap: 8,
         }}>
           <span style={{ fontSize: 28 }}>⚠</span>
           <span>Failed to load 3D model</span>
