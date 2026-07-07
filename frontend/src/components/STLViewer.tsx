@@ -21,11 +21,16 @@ export default function STLViewer({ url, width = 600, height = 420 }: STLViewerP
     const mount = mountRef.current
     if (!mount) return
 
+    // Prevents async callbacks (onLoad, onError) and the rAF loop from
+    // running after cleanup — avoids "update() on disposed controls" crashes
+    // and React Strict Mode double-invocation issues.
+    let disposed = false
+
     // Scene
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0x3d3d3d)
 
-    // Camera — initial near/far are overridden once the mesh loads
+    // Camera — near/far are overridden once the mesh loads
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 10000)
     camera.position.set(0, 0, 300)
 
@@ -36,7 +41,7 @@ export default function STLViewer({ url, width = 600, height = 420 }: STLViewerP
     renderer.shadowMap.enabled = true
     mount.appendChild(renderer.domElement)
 
-    // Lights — soft wraparound like clinical imaging software
+    // Lights
     const ambient = new THREE.AmbientLight(0xffffff, 0.45)
     scene.add(ambient)
     const key = new THREE.DirectionalLight(0xffffff, 0.9)
@@ -59,13 +64,15 @@ export default function STLViewer({ url, width = 600, height = 420 }: STLViewerP
     loader.load(
       url,
       (geometry) => {
+        if (disposed) return
+
         geometry.computeBoundingBox()
         geometry.center()
 
         const size = new THREE.Vector3()
         geometry.boundingBox!.getSize(size)
         const maxDim = Math.max(size.x, size.y, size.z)
-        // Guard against empty mesh (maxDim=0 collapses the frustum)
+        // Guard against empty mesh: maxDim=0 collapses the frustum to nothing
         const effectiveDim = maxDim > 0 ? maxDim : 300
         camera.position.set(0, 0, effectiveDim * 1.8)
         camera.near = effectiveDim * 0.01
@@ -82,12 +89,12 @@ export default function STLViewer({ url, width = 600, height = 420 }: STLViewerP
           side: THREE.DoubleSide,
           flatShading: false,
         })
-        const mesh = new THREE.Mesh(geometry, material)
-        scene.add(mesh)
+        scene.add(new THREE.Mesh(geometry, material))
         setViewerLoading(false)
       },
       undefined,
       (_err) => {
+        if (disposed) return
         setLoadError('Failed to load 3D model')
         setViewerLoading(false)
       },
@@ -96,6 +103,7 @@ export default function STLViewer({ url, width = 600, height = 420 }: STLViewerP
     // Animate
     let animId: number
     const animate = () => {
+      if (disposed) return
       animId = requestAnimationFrame(animate)
       controls.update()
       renderer.render(scene, camera)
@@ -103,6 +111,7 @@ export default function STLViewer({ url, width = 600, height = 420 }: STLViewerP
     animate()
 
     return () => {
+      disposed = true
       cancelAnimationFrame(animId)
       controls.dispose()
       renderer.dispose()
